@@ -603,6 +603,7 @@ export default function Sidebar() {
           { id: "rename", label: "Rename thread" },
           { id: "mark-unread", label: "Mark unread" },
           { id: "copy-thread-id", label: "Copy Thread ID" },
+          { id: "archive", label: "Archive" },
           { id: "delete", label: "Delete", destructive: true },
         ],
         position,
@@ -635,6 +636,23 @@ export default function Sidebar() {
             title: "Failed to copy thread ID",
             description: error instanceof Error ? error.message : "An error occurred.",
           });
+        }
+        return;
+      }
+      if (clicked === "archive") {
+        await api.orchestration.dispatchCommand({
+          type: "thread.meta.update",
+          commandId: newCommandId(),
+          threadId,
+          archived: true,
+        });
+        if (routeThreadId === threadId) {
+          const fallbackThreadId = threads.find((entry) => entry.id !== threadId)?.id ?? null;
+          if (fallbackThreadId) {
+            void navigate({ to: "/$threadId", params: { threadId: fallbackThreadId }, replace: true });
+          } else {
+            void navigate({ to: "/", replace: true });
+          }
         }
         return;
       }
