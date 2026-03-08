@@ -671,7 +671,6 @@ export default function Sidebar() {
           });
           return;
         }
-        });
         if (routeThreadId === threadId) {
           const fallbackThreadId = threads.find((entry) => entry.id !== threadId)?.id ?? null;
           if (fallbackThreadId) {
