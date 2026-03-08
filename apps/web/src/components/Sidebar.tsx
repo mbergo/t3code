@@ -313,7 +313,7 @@ export default function Sidebar() {
     [projects],
   );
 
-  // Sort projects: most-recently-active project first (by latest thread updatedAt or createdAt),
+  // Sort projects: most-recently-active project first (by latest turn completedAt or thread createdAt),
   // with new projects (no threads yet) ranked by their own createdAt descending.
   const sortedProjects = useMemo(() => {
     const latestActivityByProjectId = new Map<string, number>();
