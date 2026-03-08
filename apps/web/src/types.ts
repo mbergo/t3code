@@ -81,6 +81,7 @@ export interface Project {
   model: string;
   expanded: boolean;
   scripts: ProjectScript[];
+  createdAt: string;
 }
 
 export interface Thread {

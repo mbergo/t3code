@@ -119,6 +119,7 @@ function mapProjectsFromReadModel(
           ? persistedExpandedProjectCwds.has(project.workspaceRoot)
           : true),
       scripts: project.scripts.map((script) => ({ ...script })),
+      createdAt: project.createdAt,
     };
   });
 }
