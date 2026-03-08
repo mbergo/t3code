@@ -62,7 +62,7 @@ import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "
 import { isNonEmpty as isNonEmptyString } from "effect/String";
 
 const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
-const THREAD_PREVIEW_LIMIT = 6;
+const THREAD_PREVIEW_LIMIT = 10;
 
 async function copyTextToClipboard(text: string): Promise<void> {
   if (typeof navigator === "undefined" || navigator.clipboard?.writeText === undefined) {
