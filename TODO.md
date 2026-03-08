@@ -10,4 +10,4 @@
 
 ## Bigger things
 
-- [ ] Queueing messages
+- [x] Queueing messages

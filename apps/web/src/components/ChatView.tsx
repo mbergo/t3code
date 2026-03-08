@@ -639,6 +639,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const [optimisticUserMessages, setOptimisticUserMessages] = useState<ChatMessage[]>([]);
   const optimisticUserMessagesRef = useRef(optimisticUserMessages);
   optimisticUserMessagesRef.current = optimisticUserMessages;
+  const messageQueueRef = useRef<
+    Array<{ id: string; text: string; interactionMode: "default" | "plan" }>
+  >([]);
+  const [messageQueueSize, setMessageQueueSize] = useState(0);
   const [localDraftErrorsByThreadId, setLocalDraftErrorsByThreadId] = useState<
     Record<ThreadId, string | null>
   >({});
@@ -1903,7 +1907,30 @@ export default function ChatView({ threadId }: ChatViewProps) {
 
   useEffect(() => {
     setExpandedWorkGroups({});
+    // Clear the message queue when switching threads.
+    messageQueueRef.current = [];
+    setMessageQueueSize(0);
   }, [activeThread?.id]);
+
+  // Drain the message queue automatically once the AI finishes a turn.
+  const prevPhaseRef = useRef(phase);
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+    if (prevPhase !== "running" || phase === "running") return;
+    if (sendInFlightRef.current) return;
+    const queued = messageQueueRef.current;
+    if (queued.length === 0) return;
+    const [next, ...rest] = queued;
+    messageQueueRef.current = rest;
+    setMessageQueueSize(rest.length);
+    if (next) {
+      void onSend(undefined, next.text, next.interactionMode);
+    }
+    // onSend intentionally excluded from deps — we only want this to fire on
+    // phase transitions (not every re-render of onSend).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   useEffect(() => {
     if (!composerMenuOpen) {
@@ -2398,7 +2425,11 @@ export default function ChatView({ threadId }: ChatViewProps) {
     [activeThread, isConnecting, isRevertingCheckpoint, isSendBusy, phase, setThreadError],
   );
 
-  const onSend = async (e?: { preventDefault: () => void }) => {
+  const onSend = async (
+    e?: { preventDefault: () => void },
+    textOverride?: string,
+    interactionModeOverride?: "default" | "plan",
+  ) => {
     e?.preventDefault();
     const api = readNativeApi();
     if (!api || !activeThread || isSendBusy || isConnecting || sendInFlightRef.current) return;
@@ -2406,7 +2437,42 @@ export default function ChatView({ threadId }: ChatViewProps) {
       onAdvanceActivePendingUserInput();
       return;
     }
-    const trimmed = prompt.trim();
+    const trimmed = (textOverride ?? prompt).trim();
+    const effectiveInteractionMode = interactionModeOverride ?? interactionMode;
+
+    // When the AI is currently running a turn, queue the message for auto-send
+    // after the turn completes rather than blocking or dropping the submission.
+    // Image attachments cannot be queued (file references may be revoked by the time
+    // the queue drains), so we only queue plain-text messages.
+    if (phase === "running" && !textOverride) {
+      if (!trimmed || composerImages.length > 0) return;
+      const queuedId = newMessageId();
+      const resolvedInteractionMode: "default" | "plan" =
+        effectiveInteractionMode === "plan" ? "plan" : "default";
+      messageQueueRef.current = [
+        ...messageQueueRef.current,
+        { id: queuedId, text: trimmed, interactionMode: resolvedInteractionMode },
+      ];
+      setMessageQueueSize(messageQueueRef.current.length);
+      setOptimisticUserMessages((existing) => [
+        ...existing,
+        {
+          id: queuedId,
+          role: "user",
+          text: trimmed,
+          createdAt: new Date().toISOString(),
+          streaming: false,
+        },
+      ]);
+      promptRef.current = "";
+      clearComposerDraftContent(activeThread.id);
+      setComposerHighlightedItemId(null);
+      setComposerCursor(0);
+      setComposerTrigger(null);
+      forceStickToBottom("smooth");
+      return;
+    }
+
     if (showPlanFollowUpPrompt && activeProposedPlan) {
       const followUp = resolvePlanFollowUpSubmission({
         draftText: trimmed,
@@ -2558,7 +2624,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           title,
           model: threadCreateModel,
           runtimeMode,
-          interactionMode,
+          interactionMode: effectiveInteractionMode,
           branch: nextThreadBranch,
           worktreePath: nextThreadWorktreePath,
           createdAt: activeThread.createdAt,
@@ -2608,7 +2674,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           createdAt: messageCreatedAt,
           ...(selectedModel ? { model: selectedModel } : {}),
           runtimeMode,
-          interactionMode,
+          interactionMode: effectiveInteractionMode,
         });
       }
 
@@ -2632,7 +2698,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
         provider: selectedProvider,
         assistantDeliveryMode: settings.enableAssistantStreaming ? "streaming" : "buffered",
         runtimeMode,
-        interactionMode,
+        interactionMode: effectiveInteractionMode,
         createdAt: messageCreatedAt,
       });
       turnStartSucceeded = true;
@@ -3735,22 +3801,52 @@ export default function ChatView({ threadId }: ChatViewProps) {
                       </Button>
                     </div>
                   ) : phase === "running" ? (
-                    <button
-                      type="button"
-                      className="flex size-8 items-center justify-center rounded-full bg-rose-500/90 text-white transition-all duration-150 hover:bg-rose-500 hover:scale-105 sm:h-8 sm:w-8"
-                      onClick={() => void onInterrupt()}
-                      aria-label="Stop generation"
-                    >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="currentColor"
-                        aria-hidden="true"
+                    <div className="flex items-center gap-2">
+                      {prompt.trim().length > 0 && (
+                        <button
+                          type="submit"
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/90 text-primary-foreground transition-all duration-150 hover:bg-primary hover:scale-105 sm:h-8 sm:w-8"
+                          aria-label="Queue message"
+                          title="Queue message — will send when AI finishes"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                          </svg>
+                        </button>
+                      )}
+                      {messageQueueSize > 0 && (
+                        <span className="text-xs text-muted-foreground/70">
+                          {messageQueueSize} queued
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="flex size-8 items-center justify-center rounded-full bg-rose-500/90 text-white transition-all duration-150 hover:bg-rose-500 hover:scale-105 sm:h-8 sm:w-8"
+                        onClick={() => void onInterrupt()}
+                        aria-label="Stop generation"
                       >
-                        <rect x="2" y="2" width="8" height="8" rx="1.5" />
-                      </svg>
-                    </button>
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <rect x="2" y="2" width="8" height="8" rx="1.5" />
+                        </svg>
+                      </button>
+                    </div>
                   ) : pendingUserInputs.length === 0 ? (
                     showPlanFollowUpPrompt ? (
                       prompt.trim().length > 0 ? (
