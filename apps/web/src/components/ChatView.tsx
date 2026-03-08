@@ -2517,7 +2517,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
     sendInFlightRef.current = true;
     beginSendPhase(baseBranchForWorktree ? "preparing-worktree" : "sending-turn");
 
-    const composerImagesSnapshot = [...composerImages];
+    // When replaying a queued message, do not capture current composer images —
+    // the queued entry never included them (images cannot be queued) and the
+    // user may have attached new images to their in-progress draft.
+    const composerImagesSnapshot = textOverride ? [] : [...composerImages];
     const messageIdForSend = newMessageId();
     const messageCreatedAt = new Date().toISOString();
     const turnAttachmentsPromise = Promise.all(
@@ -2553,11 +2556,16 @@ export default function ChatView({ threadId }: ChatViewProps) {
     forceStickToBottom("smooth");
 
     setThreadError(threadIdForSend, null);
-    promptRef.current = "";
-    clearComposerDraftContent(threadIdForSend);
-    setComposerHighlightedItemId(null);
-    setComposerCursor(0);
-    setComposerTrigger(null);
+    // When replaying a queued message the composer already had its draft
+    // cleared at queue time. Clearing again would wipe any new text the user
+    // typed while waiting for the previous turn to finish.
+    if (!textOverride) {
+      promptRef.current = "";
+      clearComposerDraftContent(threadIdForSend);
+      setComposerHighlightedItemId(null);
+      setComposerCursor(0);
+      setComposerTrigger(null);
+    }
 
     let createdServerThreadForLocalDraft = false;
     let turnStartSucceeded = false;
