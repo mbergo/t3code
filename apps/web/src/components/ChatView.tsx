@@ -2454,16 +2454,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
         { id: queuedId, text: trimmed, interactionMode: resolvedInteractionMode },
       ];
       setMessageQueueSize(messageQueueRef.current.length);
-      setOptimisticUserMessages((existing) => [
-        ...existing,
-        {
-          id: queuedId,
-          role: "user",
-          text: trimmed,
-          createdAt: new Date().toISOString(),
-          streaming: false,
-        },
-      ]);
+      // Do not add an optimistic user message for queued sends.
+      // The actual send path will add an optimistic entry with the
+      // correct message ID that the server will later acknowledge,
+      // avoiding duplicate optimistic messages that cannot be reconciled.
       promptRef.current = "";
       clearComposerDraftContent(activeThread.id);
       setComposerHighlightedItemId(null);
