@@ -2446,12 +2446,11 @@ export default function ChatView({ threadId }: ChatViewProps) {
     // the queue drains), so we only queue plain-text messages.
     if (phase === "running" && !textOverride) {
       if (!trimmed || composerImages.length > 0) return;
-      const queuedId = newMessageId();
       const resolvedInteractionMode: "default" | "plan" =
         effectiveInteractionMode === "plan" ? "plan" : "default";
       messageQueueRef.current = [
         ...messageQueueRef.current,
-        { id: queuedId, text: trimmed, interactionMode: resolvedInteractionMode },
+        { id: newMessageId(), text: trimmed, interactionMode: resolvedInteractionMode },
       ];
       setMessageQueueSize(messageQueueRef.current.length);
       // Do not add an optimistic user message for queued sends.
