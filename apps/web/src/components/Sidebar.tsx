@@ -656,11 +656,21 @@ export default function Sidebar() {
         return;
       }
       if (clicked === "archive") {
-        await api.orchestration.dispatchCommand({
-          type: "thread.meta.update",
-          commandId: newCommandId(),
-          threadId,
-          archived: true,
+        try {
+          await api.orchestration.dispatchCommand({
+            type: "thread.meta.update",
+            commandId: newCommandId(),
+            threadId,
+            archived: true,
+          });
+        } catch (error) {
+          toastManager.add({
+            type: "error",
+            title: "Failed to archive thread",
+            description: error instanceof Error ? error.message : "An error occurred.",
+          });
+          return;
+        }
         });
         if (routeThreadId === threadId) {
           const fallbackThreadId = threads.find((entry) => entry.id !== threadId)?.id ?? null;
