@@ -2741,6 +2741,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const onInterrupt = async () => {
     const api = readNativeApi();
     if (!api || !activeThread) return;
+    // Clear the message queue so the drain effect doesn't auto-send the next
+    // queued message once the phase transitions away from "running".
+    messageQueueRef.current = [];
+    setMessageQueueSize(0);
     await api.orchestration.dispatchCommand({
       type: "thread.turn.interrupt",
       commandId: newCommandId(),
