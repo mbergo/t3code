@@ -1777,11 +1777,14 @@ export default function ChatView({ threadId }: ChatViewProps) {
     },
     [cancelPendingInteractionAnchorAdjustment],
   );
-  const forceStickToBottom = useCallback(() => {
-    cancelPendingStickToBottom();
-    scrollMessagesToBottom();
-    scheduleStickToBottom();
-  }, [cancelPendingStickToBottom, scheduleStickToBottom, scrollMessagesToBottom]);
+  const forceStickToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      cancelPendingStickToBottom();
+      scrollMessagesToBottom(behavior);
+      scheduleStickToBottom();
+    },
+    [cancelPendingStickToBottom, scheduleStickToBottom, scrollMessagesToBottom],
+  );
   const onMessagesScroll = useCallback(() => {
     const scrollContainer = messagesScrollRef.current;
     if (!scrollContainer) return;
@@ -2488,7 +2491,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
     ]);
     // Sending a message should always bring the latest user turn into view.
     shouldAutoScrollRef.current = true;
-    forceStickToBottom();
+    forceStickToBottom("smooth");
 
     setThreadError(threadIdForSend, null);
     promptRef.current = "";
@@ -2873,7 +2876,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
         },
       ]);
       shouldAutoScrollRef.current = true;
-      forceStickToBottom();
+      forceStickToBottom("smooth");
 
       try {
         await persistThreadSettingsForNextTurn({
