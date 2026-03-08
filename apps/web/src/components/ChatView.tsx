@@ -640,7 +640,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const optimisticUserMessagesRef = useRef(optimisticUserMessages);
   optimisticUserMessagesRef.current = optimisticUserMessages;
   const messageQueueRef = useRef<
-    Array<{ id: string; text: string; interactionMode: "default" | "plan" }>
+    Array<{ text: string; interactionMode: "default" | "plan" }>
   >([]);
   const [messageQueueSize, setMessageQueueSize] = useState(0);
   const [localDraftErrorsByThreadId, setLocalDraftErrorsByThreadId] = useState<
@@ -2450,7 +2450,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
         effectiveInteractionMode === "plan" ? "plan" : "default";
       messageQueueRef.current = [
         ...messageQueueRef.current,
-        { id: newMessageId(), text: trimmed, interactionMode: resolvedInteractionMode },
+        { text: trimmed, interactionMode: resolvedInteractionMode },
       ];
       setMessageQueueSize(messageQueueRef.current.length);
       // Do not add an optimistic user message for queued sends.
